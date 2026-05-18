@@ -1,5 +1,6 @@
 package com.cresensolutions.document_search_azure_indexing.service;
 
+import com.cresensolutions.document_search_azure_indexing.dto.DiSpan;
 import com.cresensolutions.document_search_azure_indexing.config.AzureIndexingProperties;
 import com.cresensolutions.document_search_azure_indexing.dto.DocumentChunk;
 import com.cresensolutions.document_search_azure_indexing.dto.ParsedDocument;
@@ -44,14 +45,17 @@ public class DocumentChunkingService {
             String content = text.substring(start, end).trim();
             if (!content.isBlank()) {
                 Map<String, Object> metadata = new HashMap<>(parsedDocument.metadata());
-                metadata.put("page_number", 0);
+                List<DiSpan> chunkSpans = matchingSpans(content, parsedDocument.diSpans());
+                int pageNumber = chunkSpans.isEmpty() ? intMetadata(metadata.get("page_number"), 0) : chunkSpans.get(0).page();
+                metadata.put("page_number", pageNumber);
+                metadata.put("di_page_spans", chunkSpans);
                 chunks.add(new DocumentChunk(
                         chunkNumber,
                         content,
                         parsedDocument.title(),
-                        0,
+                        pageNumber,
                         metadata,
-                        parsedDocument.diSpans()
+                        chunkSpans
                 ));
                 chunkNumber++;
             }
@@ -63,5 +67,33 @@ public class DocumentChunkingService {
         }
 
         return chunks;
+    }
+
+    private List<DiSpan> matchingSpans(String chunkText, List<DiSpan> spans) {
+        if (spans == null || spans.isEmpty()) {
+            return List.of();
+        }
+        return spans.stream()
+                .filter(span -> belongsToChunk(chunkText, span.paragraphText()))
+                .toList();
+    }
+
+    private boolean belongsToChunk(String chunkText, String paragraphText) {
+        if (paragraphText == null || paragraphText.isBlank()) {
+            return false;
+        }
+        String normalizedParagraph = paragraphText.trim();
+        if (chunkText.contains(normalizedParagraph)) {
+            return true;
+        }
+        if (normalizedParagraph.length() <= 20) {
+            return false;
+        }
+        String fingerprint = normalizedParagraph.substring(0, Math.min(60, normalizedParagraph.length())).trim();
+        return !fingerprint.isBlank() && chunkText.contains(fingerprint);
+    }
+
+    private int intMetadata(Object value, int fallback) {
+        return value instanceof Number number ? number.intValue() : fallback;
     }
 }

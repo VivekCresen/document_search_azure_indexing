@@ -3,10 +3,12 @@ package com.cresensolutions.document_search_azure_indexing.service;
 import com.cresensolutions.document_search_azure_indexing.config.AzureIndexingProperties;
 import com.cresensolutions.document_search_azure_indexing.dto.EnrichmentResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.MediaType;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
@@ -16,16 +18,16 @@ public class MetadataEnrichmentService {
 
     private final AzureIndexingProperties properties;
     private final ObjectMapper objectMapper;
-    private final RestClient restClient;
+    private final ObjectProvider<ChatModel> chatModelProvider;
 
     public MetadataEnrichmentService(
             AzureIndexingProperties properties,
             ObjectMapper objectMapper,
-            RestClient.Builder restClientBuilder
+            ObjectProvider<ChatModel> chatModelProvider
     ) {
         this.properties = properties;
         this.objectMapper = objectMapper;
-        this.restClient = restClientBuilder.build();
+        this.chatModelProvider = chatModelProvider;
     }
 
     public EnrichmentResult enrich(String chunkText) {
@@ -52,23 +54,11 @@ public class MetadataEnrichmentService {
                 """.formatted(chunkText.substring(0, Math.min(chunkText.length(), 2000)));
 
         try {
-            String url = "%s/openai/deployments/%s/chat/completions?api-version=%s".formatted(
-                    properties.openAi().endpoint().replaceAll("/$", ""),
-                    properties.openAi().chatDeployment(),
-                    properties.openAi().apiVersion()
-            );
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restClient.post()
-                    .uri(url)
-                    .header("api-key", properties.openAi().apiKey())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "messages", List.of(Map.of("role", "user", "content", prompt)),
-                            "response_format", Map.of("type", "json_object")
-                    ))
-                    .retrieve()
-                    .body(Map.class);
-
+            ChatModel chatModel = chatModelProvider.getIfAvailable();
+            if (chatModel == null) {
+                return EnrichmentResult.empty();
+            }
+            ChatResponse response = chatModel.call(new Prompt(prompt));
             String content = extractContent(response);
             if (!StringUtils.hasText(content)) {
                 return EnrichmentResult.empty();
@@ -85,16 +75,11 @@ public class MetadataEnrichmentService {
         }
     }
 
-    private String extractContent(Map<String, Object> response) {
-        if (response == null || !(response.get("choices") instanceof List<?> choices) || choices.isEmpty()) {
+    private String extractContent(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             return "";
         }
-        Object first = choices.get(0);
-        if (!(first instanceof Map<?, ?> choice) || !(choice.get("message") instanceof Map<?, ?> message)) {
-            return "";
-        }
-        Object content = message.containsKey("content") ? message.get("content") : "";
-        return String.valueOf(content);
+        return response.getResult().getOutput().getText();
     }
 
     private List<String> stringList(Object value) {

@@ -91,8 +91,14 @@ azure:
       max-jobs-per-cycle: ${INDEXING_MAX_JOBS_PER_CYCLE:4}
       supported-extensions:
         - .pdf
+        - .doc
         - .docx
         - .txt
+        - .png
+        - .jpg
+        - .jpeg
+        - .tiff
+        - .bmp
 
 management:
   endpoints:
