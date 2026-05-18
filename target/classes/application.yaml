@@ -13,8 +13,8 @@ spring:
 
   ai:
     model:
-      chat: ${SPRING_AI_MODEL_CHAT:none}
-      embedding: ${SPRING_AI_MODEL_EMBEDDING:none}
+      chat: ${SPRING_AI_MODEL_CHAT:azure-openai}
+      embedding: ${SPRING_AI_MODEL_EMBEDDING:azure-openai}
       image: none
       audio:
         transcription: none
@@ -86,6 +86,9 @@ azure:
       max-retries: ${MAX_RETRIES:3}
       blob-scan-enabled: ${INDEXING_BLOB_SCAN_ENABLED:false}
       blob-scan-fixed-delay-ms: ${INDEXING_BLOB_SCAN_FIXED_DELAY_MS:60000}
+      job-processing-enabled: ${INDEXING_JOB_PROCESSING_ENABLED:false}
+      job-processing-fixed-delay-ms: ${INDEXING_JOB_PROCESSING_FIXED_DELAY_MS:120000}
+      max-jobs-per-cycle: ${INDEXING_MAX_JOBS_PER_CYCLE:4}
       supported-extensions:
         - .pdf
         - .docx

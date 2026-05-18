@@ -93,7 +93,8 @@ public class MetadataEnrichmentService {
         if (!(first instanceof Map<?, ?> choice) || !(choice.get("message") instanceof Map<?, ?> message)) {
             return "";
         }
-        return String.valueOf(message.getOrDefault("content", ""));
+        Object content = message.containsKey("content") ? message.get("content") : "";
+        return String.valueOf(content);
     }
 
     private List<String> stringList(Object value) {

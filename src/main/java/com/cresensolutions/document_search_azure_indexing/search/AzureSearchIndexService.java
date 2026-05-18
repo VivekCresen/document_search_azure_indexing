@@ -38,13 +38,14 @@ public class AzureSearchIndexService {
         if (documents == null || documents.isEmpty()) {
             return;
         }
-        postIndexActions(documents.stream()
-                .map(document -> {
+        List<Map<String, Object>> actions = documents.stream()
+                .<Map<String, Object>>map(document -> {
                     java.util.LinkedHashMap<String, Object> action = new java.util.LinkedHashMap<>(document);
                     action.put("@search.action", "upload");
                     return action;
                 })
-                .toList());
+                .toList();
+        postIndexActions(actions);
     }
 
     public void deleteDocumentsByIds(List<String> documentIds) {
