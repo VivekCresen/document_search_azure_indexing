@@ -36,16 +36,20 @@ public class FolderResolverServiceImpl implements FolderResolverService {
     @Override
     @Cacheable(value = Constants.CACHE_FOLDER_RESOLUTION, key = "#blobUri")
     public Optional<Long> resolveFolderId(String blobUri) {
+        // Step 1: Decode and extract relative folder structure from the Blob URI
         List<String> segments = extractRelativePathSegments(blobUri);
         if (segments.size() <= 1) {
-            return Optional.empty();
+            return Optional.empty(); // No folder structure exists (e.g. root file)
         }
 
+        // Target folders by removing the actual filename (last segment)
         List<String> folderSegments = new java.util.ArrayList<>(segments.subList(0, segments.size() - 1));
+        // Prune off numeric ID segments if the last folder is just a database ID representation
         if (!folderSegments.isEmpty() && folderSegments.get(folderSegments.size() - 1).matches("\\d+")) {
             folderSegments.remove(folderSegments.size() - 1);
         }
 
+        // Step 2: Try resolving folder hierarchy sequentially (from root or descending sub-paths)
         for (int start = 0; start < folderSegments.size(); start++) {
             Optional<Long> resolved = resolveHierarchy(folderSegments.subList(start, folderSegments.size()));
             if (resolved.isPresent()) {
@@ -53,6 +57,7 @@ public class FolderResolverServiceImpl implements FolderResolverService {
             }
         }
 
+        // Step 3: Fallback - locate any matching folder by name in reverse order
         for (int index = folderSegments.size() - 1; index >= 0; index--) {
             Optional<Long> byName = findAnyFolderByName(folderSegments.get(index));
             if (byName.isPresent()) {
@@ -63,11 +68,20 @@ public class FolderResolverServiceImpl implements FolderResolverService {
         return Optional.empty();
     }
 
+    /**
+     * Extracts and cleans relative path segments from the fully qualified blob storage URI.
+     * Decodes URL character sequences, removes container prefixes, and splits folders by path separators.
+     *
+     * @param blobUri the storage reference URL to process
+     * @return a list of folder names and filename segments
+     */
     private List<String> extractRelativePathSegments(String blobUri) {
         try {
+            // Replace space character representations and isolate path section
             String path = URI.create(blobUri.replace(" ", "%20")).getPath();
             String decoded = URLDecoder.decode(path, StandardCharsets.UTF_8);
             String marker = "/" + properties.storage().containerName() + "/";
+            // Trim standard container prefix to get the relative folder structure path
             String relativePath = decoded.contains(marker)
                     ? decoded.substring(decoded.indexOf(marker) + marker.length())
                     : decoded.replaceFirst("^/", "");
@@ -79,6 +93,13 @@ public class FolderResolverServiceImpl implements FolderResolverService {
         }
     }
 
+    /**
+     * Attempts to find a sequence of nested folder records in database following the segment hierarchy.
+     * Starts with a parent_id of null (root folder) and traverses downwards.
+     *
+     * @param folderSegments ordered list of nested folder names
+     * @return an Optional containing the terminal folder's database ID if resolved
+     */
     private Optional<Long> resolveHierarchy(List<String> folderSegments) {
         Long parentId = null;
         Long currentId = null;
@@ -88,11 +109,19 @@ public class FolderResolverServiceImpl implements FolderResolverService {
                 return Optional.empty();
             }
             currentId = next.get();
-            parentId = currentId;
+            parentId = currentId; // Current folder becomes parent of next folder segment
         }
         return Optional.ofNullable(currentId);
     }
 
+    /**
+     * Queries database using JdbcTemplate to resolve a folder ID given its name and parent ID.
+     * Handles root directories separately where parent_id is null.
+     *
+     * @param name folder name
+     * @param parentId ID of the parent folder or null for root
+     * @return an Optional containing the folder ID if found
+     */
     private Optional<Long> findFolder(String name, Long parentId) {
         String sql = parentId == null
                 ? "select id from prestage.documents where name = ? and is_file = false and parent_id is null limit 1"
@@ -103,6 +132,13 @@ public class FolderResolverServiceImpl implements FolderResolverService {
         return ids.stream().findFirst();
     }
 
+    /**
+     * Fallback query to find any folder record in the DB matching the name, sorting by ID desc.
+     * Used when full path hierarchy resolution fails.
+     *
+     * @param name folder name
+     * @return an Optional containing the latest matching folder ID if found
+     */
     private Optional<Long> findAnyFolderByName(String name) {
         List<Long> ids = jdbcTemplate.queryForList(
                 "select id from prestage.documents where name = ? and is_file = false order by id desc limit 1",

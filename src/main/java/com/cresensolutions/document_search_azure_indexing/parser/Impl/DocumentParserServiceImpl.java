@@ -73,20 +73,29 @@ public class DocumentParserServiceImpl implements DocumentParserService {
         return parseWithTika(downloadedBlob);
     }
 
+
     /**
      * Extracts text from the downloaded file using local Apache Tika library.
+     * Used as the default parsing method or as a fallback for unsupported formats
+     * and API failures.
+     *
+     * @param downloadedBlob the blob metadata and file reference to parse
+     * @return the parsed document with extracted text and metadata
      */
     private ParsedDocument parseWithTika(DownloadedBlob downloadedBlob) {
         try (InputStream inputStream = Files.newInputStream(downloadedBlob.path())) {
+            // Setup Tika content handler with unlimited characters (-1)
             BodyContentHandler handler = new BodyContentHandler(-1);
             Metadata tikaMetadata = new Metadata();
             parser.parse(inputStream, handler, tikaMetadata, new ParseContext());
 
+            // Normalize the extracted text to clean up excessive spacing/newlines
             String text = normalize(handler.toString());
             if (text.isBlank()) {
                 throw new IllegalStateException("No extractable text found in " + downloadedBlob.fileName());
             }
 
+            // Copy all Tika extracted metadata into standard map
             Map<String, Object> metadata = new HashMap<>();
             for (String name : tikaMetadata.names()) {
                 metadata.put(name, tikaMetadata.get(name));
@@ -102,13 +111,25 @@ public class DocumentParserServiceImpl implements DocumentParserService {
         }
     }
 
+    /**
+     * Parses the document using Azure Document Intelligence REST API.
+     * Sends the file as a base64 encoded string, initiates the analyze operation,
+     * and polls the API for completion before parsing the result.
+     *
+     * @param downloadedBlob the blob reference containing the file path
+     * @return the parsed document from Document Intelligence results
+     * @throws Exception if API call fails, times out, or response parsing fails
+     */
     private ParsedDocument parseWithDocumentIntelligence(DownloadedBlob downloadedBlob) throws Exception {
+        // Build URL targeting the prebuilt-read model API
         String submitUrl = "%s/documentintelligence/documentModels/prebuilt-read:analyze?api-version=%s".formatted(
                 CommonUtils.trimTrailingSlash(properties.documentIntelligence().endpoint()),
                 properties.documentIntelligence().apiVersion()
         );
+        // Read file contents and encode to Base64 format
         String base64Source = Base64.getEncoder().encodeToString(Files.readAllBytes(downloadedBlob.path()));
 
+        // Submit the parsing job to Azure Document Intelligence
         ResponseEntity<Void> response = restClient.post()
                 .uri(submitUrl)
                 .header("Ocp-Apim-Subscription-Key", properties.documentIntelligence().apiKey())
@@ -117,15 +138,26 @@ public class DocumentParserServiceImpl implements DocumentParserService {
                 .retrieve()
                 .toBodilessEntity();
 
+        // Retrieve the poll endpoint URL from Operation-Location header
         String operationUrl = response.getHeaders().getFirst("Operation-Location");
         if (!StringUtils.hasText(operationUrl)) {
             throw new IllegalStateException("Document Intelligence did not return an Operation-Location header");
         }
 
+        // Poll the job status until completion
         Map<String, Object> analyzeResult = pollDocumentIntelligenceOperation(operationUrl);
         return toParsedDocument(downloadedBlob, analyzeResult);
     }
 
+    /**
+     * Polls the Azure Document Intelligence operation endpoint until the task succeeds,
+     * fails, or the overall wait time exceeds the deadline (120 seconds).
+     *
+     * @param operationUrl the URL to query the status of the analyze operation
+     * @return the map representation of 'analyzeResult'
+     * @throws InterruptedException if thread sleeping is interrupted
+     * @throws IllegalStateException if operation fails or times out
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> pollDocumentIntelligenceOperation(String operationUrl) throws InterruptedException {
         long deadline = System.nanoTime() + Duration.ofSeconds(120).toNanos();
@@ -137,6 +169,8 @@ public class DocumentParserServiceImpl implements DocumentParserService {
                     .body(Map.class);
 
             String status = response == null ? "" : String.valueOf(response.getOrDefault("status", ""));
+            
+            // Check status of the asynchronous operation
             if ("succeeded".equalsIgnoreCase(status)) {
                 Object analyzeResult = response.get("analyzeResult");
                 return analyzeResult instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
@@ -144,17 +178,27 @@ public class DocumentParserServiceImpl implements DocumentParserService {
             if ("failed".equalsIgnoreCase(status)) {
                 throw new IllegalStateException("Document Intelligence operation failed: " + response.get("error"));
             }
+            // Wait 3 seconds between successive polls to avoid rate limits
             Thread.sleep(3000);
         }
         throw new IllegalStateException("Document Intelligence operation timed out");
     }
 
+    /**
+     * Converts raw JSON structure from Azure Document Intelligence response to a structured ParsedDocument.
+     * Extracts page layout and positional coordinates (spans) for paragraphs or lines.
+     *
+     * @param downloadedBlob the source blob data
+     * @param analyzeResult raw response map from Azure API
+     * @return structured parsed document
+     */
     @SuppressWarnings("unchecked")
     private ParsedDocument toParsedDocument(DownloadedBlob downloadedBlob, Map<String, Object> analyzeResult) {
         List<Map<String, Object>> paragraphs = listOfMaps(analyzeResult.get("paragraphs"));
         List<DiSpan> spans = new ArrayList<>();
         List<String> textParts = new ArrayList<>();
 
+        // Process paragraphs to extract content, page numbers, and bounding polygon coordinates
         for (Map<String, Object> paragraph : paragraphs) {
             String paragraphText = String.valueOf(paragraph.getOrDefault("content", "")).trim();
             if (!StringUtils.hasText(paragraphText)) {
@@ -174,6 +218,7 @@ public class DocumentParserServiceImpl implements DocumentParserService {
             textParts.add(paragraphText);
         }
 
+        // Fall back to extracting line by line if no paragraph data is available
         if (textParts.isEmpty()) {
             for (Map<String, Object> page : listOfMaps(analyzeResult.get("pages"))) {
                 for (Map<String, Object> line : listOfMaps(page.get("lines"))) {
@@ -190,6 +235,7 @@ public class DocumentParserServiceImpl implements DocumentParserService {
             throw new IllegalStateException("No extractable text found in " + downloadedBlob.fileName());
         }
 
+        // Populate metadata for indexing
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("blob_uri", downloadedBlob.blobUri());
         metadata.put("source", downloadedBlob.fileName());
@@ -200,6 +246,13 @@ public class DocumentParserServiceImpl implements DocumentParserService {
         return new ParsedDocument(text, extractTitle(text, downloadedBlob.fileName()), metadata, spans);
     }
 
+    /**
+     * Safely casts an object to a List of Map<String, Object>.
+     * Useful for parsing nested elements in response JSON.
+     *
+     * @param value raw object representing a list
+     * @return typed List of Maps
+     */
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> listOfMaps(Object value) {
         if (!(value instanceof List<?> list)) {
@@ -211,6 +264,13 @@ public class DocumentParserServiceImpl implements DocumentParserService {
                 .toList();
     }
 
+    /**
+     * Safely casts and maps a generic list of numbers to a List of Doubles.
+     * Used primarily for retrieving polygon coordinate values.
+     *
+     * @param value raw object representing a list of numbers
+     * @return List of Double values
+     */
     private List<Double> numberList(Object value) {
         if (!(value instanceof List<?> list)) {
             return List.of();
@@ -222,24 +282,57 @@ public class DocumentParserServiceImpl implements DocumentParserService {
                 .toList();
     }
 
+    /**
+     * Helper to safely extract integer value from numeric type, with fallback support.
+     *
+     * @param value numeric object
+     * @param fallback default value if object is not a number
+     * @return converted integer or fallback
+     */
     private int intValue(Object value, int fallback) {
         return value instanceof Number number ? number.intValue() : fallback;
     }
 
+    /**
+     * Checks if Azure Document Intelligence configuration endpoint and key are correctly populated.
+     *
+     * @return true if enabled, false otherwise
+     */
     private boolean isDocumentIntelligenceEnabled() {
         return StringUtils.hasText(properties.documentIntelligence().endpoint())
                 && StringUtils.hasText(properties.documentIntelligence().apiKey());
     }
 
+    /**
+     * Determines whether the given filename is supported natively by Azure Document Intelligence
+     * based on its file extension.
+     *
+     * @param fileName name of the file to inspect
+     * @return true if extension is supported by Document Intelligence
+     */
     private boolean isDocumentIntelligenceSupported(String fileName) {
         String lowerFileName = fileName == null ? "" : fileName.toLowerCase();
         return DOCUMENT_INTELLIGENCE_EXTENSIONS.stream().anyMatch(lowerFileName::endsWith);
     }
 
+    /**
+     * Cleans up string line endings and replaces excessive newline sequences with standard format.
+     *
+     * @param text raw extracted text
+     * @return normalized text
+     */
     private String normalize(String text) {
         return text == null ? "" : text.replace("\r\n", "\n").replaceAll("\\n{3,}", "\n\n").trim();
     }
 
+    /**
+     * Attempts to extract a meaningful title from the parsed content by identifying the first
+     * non-empty line of substantial length. Falls back to filename if none found.
+     *
+     * @param text extracted document text
+     * @param fallback the default title to return (usually the filename)
+     * @return extracted title or fallback
+     */
     private String extractTitle(String text, String fallback) {
         return text.lines()
                 .map(String::trim)
