@@ -11,23 +11,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/indexing/jobs")
+@RequiredArgsConstructor
 public class IndexingJobController {
 
     private final DocumentIndexingWorkerService workerService;
     private final AzureSearchIndexService azureSearchIndexService;
     private final AzureIndexingProperties properties;
 
-    public IndexingJobController(
-            DocumentIndexingWorkerService workerService,
-            AzureSearchIndexService azureSearchIndexService,
-            AzureIndexingProperties properties
-    ) {
-        this.workerService = workerService;
-        this.azureSearchIndexService = azureSearchIndexService;
-        this.properties = properties;
-    }
 
     @PostMapping("/process")
     public JobProcessResult process(@RequestParam(required = false) Integer maxJobs) {

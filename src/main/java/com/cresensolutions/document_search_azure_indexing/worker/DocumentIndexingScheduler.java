@@ -7,18 +7,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
 @Slf4j
+@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "azure.indexing.settings", name = "job-processing-enabled", havingValue = "true")
 public class DocumentIndexingScheduler {
 
     private final DocumentIndexingWorkerService workerService;
     private final AzureIndexingProperties properties;
 
-    public DocumentIndexingScheduler(DocumentIndexingWorkerService workerService, AzureIndexingProperties properties) {
-        this.workerService = workerService;
-        this.properties = properties;
-    }
 
     @Scheduled(fixedDelayString = "${azure.indexing.settings.job-processing-fixed-delay-ms:120000}")
     public void processQueuedJobs() {

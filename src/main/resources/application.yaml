@@ -21,8 +21,8 @@ spring:
         speech: none
     azure:
       openai:
-        endpoint: ${AZURE_OPENAI_ENDPOINT:}
-        api-key: ${AZURE_OPENAI_KEY:}
+        endpoint: ${AZURE_OPENAI_ENDPOINT:https://dummy.openai.azure.com/}
+        api-key: ${AZURE_OPENAI_KEY:dummy-key}
         chat:
           options:
             deployment-name: ${AZURE_OPENAI_DEPLOYMENT:gpt-4o-mini}
@@ -58,26 +58,26 @@ spring:
 azure:
   indexing:
     search:
-      endpoint: ${AZURE_SEARCH_ENDPOINT:}
-      api-key: ${AZURE_SEARCH_ADMIN_KEY:${AZURE_SEARCH_KEY:}}
+      endpoint: ${AZURE_SEARCH_ENDPOINT:https://dummy.search.windows.net}
+      api-key: ${AZURE_SEARCH_ADMIN_KEY:${AZURE_SEARCH_KEY:dummy-key}}
       index-name: ${AZURE_SEARCH_INDEX_NAME:document-index}
       api-version: ${AZURE_SEARCH_API_VERSION:2023-11-01}
     storage:
-      account-name: ${AZURE_STORAGE_ACCOUNT_NAME:}
-      account-key: ${AZURE_STORAGE_ACCOUNT_KEY:}
-      account-url: ${AZURE_STORAGE_ACCOUNT_URL:}
+      account-name: ${AZURE_STORAGE_ACCOUNT_NAME:cresengpt}
+      account-key: ${AZURE_STORAGE_ACCOUNT_KEY:dummy-storage-key}
+      account-url: ${AZURE_STORAGE_ACCOUNT_URL:https://cresengpt.blob.core.windows.net/}
       connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
-      container-name: ${AZURE_STORAGE_CONTAINER_NAME:}
+      container-name: ${AZURE_STORAGE_CONTAINER_NAME:internchatgptdoccontainer}
       directory: ${INDEXING_DIRECTORY:}
     open-ai:
-      endpoint: ${AZURE_OPENAI_ENDPOINT:}
-      api-key: ${AZURE_OPENAI_KEY:}
+      endpoint: ${AZURE_OPENAI_ENDPOINT:https://dummy.openai.azure.com/}
+      api-key: ${AZURE_OPENAI_KEY:dummy-key}
       embedding-deployment: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
       chat-deployment: ${AZURE_OPENAI_DEPLOYMENT:gpt-4o-mini}
       api-version: ${AZURE_OPENAI_API_VERSION:2024-02-01}
     document-intelligence:
-      endpoint: ${AZURE_DI_ENDPOINT:}
-      api-key: ${AZURE_DI_KEY:}
+      endpoint: ${AZURE_DI_ENDPOINT:https://dummy.cognitiveservices.azure.com/}
+      api-key: ${AZURE_DI_KEY:dummy-key}
       api-version: ${AZURE_DI_API_VERSION:2024-02-29-preview}
     settings:
       chunk-size: ${CHUNK_SIZE:1500}

@@ -10,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.cresensolutions.document_search_azure_indexing.commons.Constants;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -37,7 +38,7 @@ public class IngestionJob {
 
     @Column(name = "status", nullable = false, length = 50)
     @Builder.Default
-    private String status = "to_be_ingested";
+    private String status = Constants.JOB_STATUS_TO_BE_INGESTED;
 
     @Column(name = "attempts", nullable = false)
     @Builder.Default
