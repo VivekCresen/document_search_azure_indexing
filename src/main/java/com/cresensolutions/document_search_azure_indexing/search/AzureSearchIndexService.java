@@ -16,6 +16,27 @@ public interface AzureSearchIndexService {
     void createOrUpdateIndex();
 
     /**
+     * Lists all Azure Search indexes available in the configured search service.
+     *
+     * @return index names
+     */
+    List<String> listIndexes();
+
+    /**
+     * Deletes an Azure Search index by name.
+     *
+     * @param indexName index to delete
+     */
+    void deleteIndex(String indexName);
+
+    /**
+     * Deletes all documents from the configured index while keeping the index schema.
+     *
+     * @return number of delete actions submitted
+     */
+    int clearConfiguredIndex();
+
+    /**
      * Uploads a batch of generated and enriched document chunks to Azure Search.
      *
      * @param documents a list of document maps matching the search index schema

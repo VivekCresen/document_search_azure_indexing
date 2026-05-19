@@ -33,10 +33,17 @@ public class AzureBlobClientConfig {
                     ? storage.accountUrl()
                     : "https://" + storage.accountName() + ".blob.core.windows.net/";
             builder.endpoint(endpoint)
-                    .credential(new StorageSharedKeyCredential(storage.accountName(), storage.accountKey()));
+                    .credential(new StorageSharedKeyCredential(storage.accountName(), stripWrappingQuotes(storage.accountKey())));
         }
 
         BlobServiceClient serviceClient = builder.buildClient();
         return serviceClient.getBlobContainerClient(storage.containerName());
+    }
+
+    private String stripWrappingQuotes(String value) {
+        if (value != null && value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 }

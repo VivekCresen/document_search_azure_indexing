@@ -5,6 +5,9 @@ import com.cresensolutions.document_search_azure_indexing.dto.JobProcessResult;
 import com.cresensolutions.document_search_azure_indexing.search.AzureSearchIndexService;
 import com.cresensolutions.document_search_azure_indexing.worker.DocumentIndexingWorkerService;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,6 +49,33 @@ public class IndexingJobController {
     @PostMapping("/index-schema")
     public Map<String, Object> createOrUpdateIndex() {
         azureSearchIndexService.createOrUpdateIndex();
-        return Map.of("index", properties.search().indexName(), "updated", true);
+        return Map.of(
+                "index", properties.search().indexName(),
+                "updated", true,
+                "message", "Index schema is available"
+        );
+    }
+
+    @DeleteMapping("/index-schema")
+    public Map<String, Object> deleteConfiguredIndex() {
+        azureSearchIndexService.deleteIndex(properties.search().indexName());
+        return Map.of("index", properties.search().indexName(), "deleted", true);
+    }
+
+    @GetMapping("/indexes")
+    public Map<String, Object> listIndexes() {
+        return Map.of("indexes", azureSearchIndexService.listIndexes());
+    }
+
+    @DeleteMapping("/indexes/{indexName}")
+    public Map<String, Object> deleteIndex(@PathVariable String indexName) {
+        azureSearchIndexService.deleteIndex(indexName);
+        return Map.of("index", indexName, "deleted", true);
+    }
+
+    @DeleteMapping("/documents")
+    public Map<String, Object> clearIndexDocuments() {
+        int deleted = azureSearchIndexService.clearConfiguredIndex();
+        return Map.of("index", properties.search().indexName(), "deletedDocuments", deleted);
     }
 }

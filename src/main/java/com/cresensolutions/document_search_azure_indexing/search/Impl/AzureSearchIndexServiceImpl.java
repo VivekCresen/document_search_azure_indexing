@@ -5,8 +5,11 @@ import com.cresensolutions.document_search_azure_indexing.search.AzureSearchInde
 import com.cresensolutions.document_search_azure_indexing.utils.CommonUtils;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +45,9 @@ public class AzureSearchIndexServiceImpl implements AzureSearchIndexService {
                 properties.search().indexName(),
                 properties.search().apiVersion()
         );
+        if (indexExists(url)) {
+            return;
+        }
         restClient.put()
                 .uri(url)
                 .header("api-key", properties.search().apiKey())
@@ -49,6 +55,99 @@ public class AzureSearchIndexServiceImpl implements AzureSearchIndexService {
                 .body(indexSchema())
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    @Override
+    public List<String> listIndexes() {
+        String url = "%s/indexes?api-version=%s".formatted(
+                CommonUtils.trimTrailingSlash(properties.search().endpoint()),
+                properties.search().apiVersion()
+        );
+        Map<?, ?> response = restClient.get()
+                .uri(url)
+                .header("api-key", properties.search().apiKey())
+                .retrieve()
+                .body(Map.class);
+        Object value = response == null ? null : response.get("value");
+        if (!(value instanceof List<?> indexes)) {
+            return List.of();
+        }
+        return indexes.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .map(index -> index.get("name"))
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .toList();
+    }
+
+    @Override
+    public void deleteIndex(String indexName) {
+        String cleanIndexName = indexName == null || indexName.isBlank()
+                ? properties.search().indexName()
+                : indexName;
+        String url = "%s/indexes/%s?api-version=%s".formatted(
+                CommonUtils.trimTrailingSlash(properties.search().endpoint()),
+                cleanIndexName,
+                properties.search().apiVersion()
+        );
+        restClient.delete()
+                .uri(url)
+                .header("api-key", properties.search().apiKey())
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    @Override
+    public int clearConfiguredIndex() {
+        List<String> documentIds = listDocumentIds();
+        deleteDocumentsByIds(documentIds);
+        return documentIds.size();
+    }
+
+    private boolean indexExists(String url) {
+        try {
+            restClient.get()
+                    .uri(url)
+                    .header("api-key", properties.search().apiKey())
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (HttpClientErrorException.NotFound ignored) {
+            return false;
+        }
+    }
+
+    private List<String> listDocumentIds() {
+        List<String> ids = new ArrayList<>();
+        String url = UriComponentsBuilder
+                .fromHttpUrl("%s/indexes/%s/docs".formatted(
+                        CommonUtils.trimTrailingSlash(properties.search().endpoint()),
+                        properties.search().indexName()
+                ))
+                .queryParam("api-version", properties.search().apiVersion())
+                .queryParam("search", "*")
+                .queryParam("$select", "id")
+                .queryParam("$top", "1000")
+                .build(false)
+                .toUriString();
+
+        Map<?, ?> response = restClient.get()
+                .uri(url)
+                .header("api-key", properties.search().apiKey())
+                .retrieve()
+                .body(Map.class);
+        Object value = response == null ? null : response.get("value");
+        if (value instanceof List<?> documents) {
+            documents.stream()
+                    .filter(Map.class::isInstance)
+                    .map(Map.class::cast)
+                    .map(document -> document.get("id"))
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .forEach(ids::add);
+        }
+        return ids;
     }
 
     /**

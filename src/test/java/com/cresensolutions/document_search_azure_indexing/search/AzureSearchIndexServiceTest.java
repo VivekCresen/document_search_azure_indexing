@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -49,22 +51,54 @@ class AzureSearchIndexServiceTest {
     }
 
     @Test
-    void testCreateOrUpdateIndex() {
+    void testCreateOrUpdateIndex_createsWhenMissing() {
+        RestClient.RequestHeadersUriSpec<?> getUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.RequestHeadersSpec<?> getSpec = mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec getResponseSpec = mock(RestClient.ResponseSpec.class);
         RestClient.RequestBodyUriSpec putUriSpec = mock(RestClient.RequestBodyUriSpec.class);
         RestClient.RequestBodySpec putSpec = mock(RestClient.RequestBodySpec.class);
-        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
+        RestClient.ResponseSpec putResponseSpec = mock(RestClient.ResponseSpec.class);
 
-        lenient().when(restClient.put()).thenReturn(putUriSpec);
-        lenient().when(putUriSpec.uri(anyString())).thenReturn(putSpec);
-        lenient().when(putSpec.header(anyString(), anyString())).thenReturn(putSpec);
-        lenient().when(putSpec.contentType(any(MediaType.class))).thenReturn(putSpec);
-        lenient().when(putSpec.body(any(Object.class))).thenReturn(putSpec);
-        lenient().when(putSpec.retrieve()).thenReturn(responseSpec);
+        when(restClient.get()).thenReturn((RestClient.RequestHeadersUriSpec) getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn((RestClient.RequestHeadersSpec) getSpec);
+        when(getSpec.header(anyString(), anyString())).thenReturn((RestClient.RequestHeadersSpec) getSpec);
+        when(getSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.toBodilessEntity()).thenThrow(HttpClientErrorException.create(
+                HttpStatus.NOT_FOUND,
+                "Not Found",
+                null,
+                null,
+                null
+        ));
+
+        when(restClient.put()).thenReturn(putUriSpec);
+        when(putUriSpec.uri(anyString())).thenReturn(putSpec);
+        when(putSpec.header(anyString(), anyString())).thenReturn(putSpec);
+        when(putSpec.contentType(any(MediaType.class))).thenReturn(putSpec);
+        when(putSpec.body(any(Object.class))).thenReturn(putSpec);
+        when(putSpec.retrieve()).thenReturn(putResponseSpec);
 
         service.createOrUpdateIndex();
 
         verify(restClient).put();
-        verify(responseSpec).toBodilessEntity();
+        verify(putResponseSpec).toBodilessEntity();
+    }
+
+    @Test
+    void testCreateOrUpdateIndex_skipsWhenExisting() {
+        RestClient.RequestHeadersUriSpec<?> getUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.RequestHeadersSpec<?> getSpec = mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec getResponseSpec = mock(RestClient.ResponseSpec.class);
+
+        when(restClient.get()).thenReturn((RestClient.RequestHeadersUriSpec) getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn((RestClient.RequestHeadersSpec) getSpec);
+        when(getSpec.header(anyString(), anyString())).thenReturn((RestClient.RequestHeadersSpec) getSpec);
+        when(getSpec.retrieve()).thenReturn(getResponseSpec);
+
+        service.createOrUpdateIndex();
+
+        verify(restClient, never()).put();
+        verify(getResponseSpec).toBodilessEntity();
     }
 
     @Test
