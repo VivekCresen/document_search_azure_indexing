@@ -2,6 +2,7 @@ package com.cresensolutions.document_search_azure_indexing.search.Impl;
 
 import com.cresensolutions.document_search_azure_indexing.config.AzureIndexingProperties;
 import com.cresensolutions.document_search_azure_indexing.search.AzureSearchIndexService;
+import com.cresensolutions.document_search_azure_indexing.utils.CommonUtils;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -9,21 +10,35 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Implementation of {@link AzureSearchIndexService} using Spring's RestClient
+ * to communicate directly with Azure Cognitive Search REST API endpoints.
+ */
 @Service
 public class AzureSearchIndexServiceImpl implements AzureSearchIndexService {
 
     private final AzureIndexingProperties properties;
     private final RestClient restClient;
 
+    /**
+     * Constructs the search service implementation.
+     *
+     * @param properties Azure configuration properties holding API keys and index names
+     * @param restClientBuilder rest client builder helper
+     */
     public AzureSearchIndexServiceImpl(AzureIndexingProperties properties, RestClient.Builder restClientBuilder) {
         this.properties = properties;
         this.restClient = restClientBuilder.build();
     }
 
+    /**
+     * Ensures the search index matches the target configuration schema,
+     * creating or upgrading the cognitive vector and indexing definitions.
+     */
     @Override
     public void createOrUpdateIndex() {
         String url = "%s/indexes/%s?api-version=%s".formatted(
-                properties.search().endpoint().replaceAll("/$", ""),
+                CommonUtils.trimTrailingSlash(properties.search().endpoint()),
                 properties.search().indexName(),
                 properties.search().apiVersion()
         );
@@ -66,7 +81,7 @@ public class AzureSearchIndexServiceImpl implements AzureSearchIndexService {
         for (int start = 0; start < actions.size(); start += batchSize) {
             int end = Math.min(actions.size(), start + batchSize);
             String url = "%s/indexes/%s/docs/index?api-version=%s".formatted(
-                    properties.search().endpoint().replaceAll("/$", ""),
+                    CommonUtils.trimTrailingSlash(properties.search().endpoint()),
                     properties.search().indexName(),
                     properties.search().apiVersion()
             );

@@ -21,6 +21,7 @@ import com.cresensolutions.document_search_azure_indexing.service.MetadataEnrich
 import com.cresensolutions.document_search_azure_indexing.worker.DocumentIndexingWorkerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cresensolutions.document_search_azure_indexing.commons.Constants;
+import com.cresensolutions.document_search_azure_indexing.utils.CommonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -40,6 +41,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Implementation of {@link DocumentIndexingWorkerService} that processes ingestion
+ * and deletion jobs in parallel, updates transactional state, and executes locks.
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -57,6 +62,13 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
     private final ObjectProvider<EmbeddingModel> embeddingModelProvider;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Executes queued ingestion and deletion tasks concurrently using Java Parallel Streams,
+     * maintaining audit trails and database tracking tables.
+     *
+     * @param maxJobs limit on the number of jobs processed in a single invocation
+     * @return counts of processed, succeeded, and failed jobs
+     */
     @Override
     public JobProcessResult processQueuedJobs(int maxJobs) {
         List<IngestionJob> ingestionJobs = lockJobs(Constants.JOB_STATUS_TO_BE_INGESTED, maxJobs);
@@ -88,6 +100,10 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         return new JobProcessResult(ingestionJobs.size() + deletionJobs.size(), totalSucceeded, totalFailed);
     }
 
+    /**
+     * Obtains processing locks on target queued ingestion or deletion jobs,
+     * assigning them unique lock IDs and incrementing retry attempts.
+     */
     @Override
     @Transactional
     public List<IngestionJob> lockJobs(String status, int maxJobs) {
@@ -110,6 +126,15 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         return ingestionJobRepository.saveAll(jobs);
     }
 
+    /**
+     * Executes the multi-stage document ingestion pipeline:
+     * 1. Downloads target blob.
+     * 2. Parses content using hybrid Tika/Azure DI strategy.
+     * 3. Segments text into semantic overlapping chunks.
+     * 4. Enriches chunks via LLM topic/intent models.
+     * 5. Computes vector embeddings via Spring AI.
+     * 6. Bulk uploads vector documents to Azure Search index.
+     */
     private void processIngestion(IngestionJob job) throws Exception {
         DownloadedBlob downloadedBlob = null;
         try {
@@ -137,7 +162,7 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
                         .searchDocumentId(searchDocumentId)
                         .chunkNumber(chunk.chunkNumber())
                         .pageNumber(chunk.pageNumber())
-                        .contentHash(sha256(chunk.content()))
+                        .contentHash(CommonUtils.sha256(chunk.content()))
                         .build());
             }
 
@@ -150,6 +175,9 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         }
     }
 
+    /**
+     * Removes a document's chunks from Azure Search index and clears local tracking rows.
+     */
     private void processDeletion(IngestionJob job) {
         List<String> documentIds = indexedChunkRepository.findByBlobUri(job.getBlobUri()).stream()
                 .map(IndexedChunk::getSearchDocumentId)
@@ -166,6 +194,9 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         audit(job, Constants.AUDIT_ACTION_DELETE_EXECUTION, Constants.JOB_STATUS_DELETED, "Deleted document chunks from Azure Search", Map.of("deleted_chunks", documentIds.size()));
     }
 
+    /**
+     * Map processed document chunk data structures to the search schema requirements.
+     */
     private Map<String, Object> toSearchDocument(
             IngestionJob job,
             DocumentChunk chunk,
@@ -181,7 +212,7 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         metadata.put("di_page_spans", chunk.diSpans());
 
         String fileName = job.getFileName() == null ? job.getBlobUri() : job.getFileName();
-        String extension = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase() : "";
+        String extension = CommonUtils.fileExtension(fileName);
 
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("id", searchDocumentId);
@@ -203,6 +234,9 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         return document;
     }
 
+    /**
+     * Helper to transform float[] raw primitives to List of Float classes.
+     */
     private List<Float> toFloatList(float[] embedding) {
         List<Float> values = new ArrayList<>(embedding.length);
         for (float value : embedding) {
@@ -211,6 +245,9 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         return values;
     }
 
+    /**
+     * Updates transactional tracking tables to complete status.
+     */
     @Override
     @Transactional
     public void completeJob(IngestionJob job, int chunkCount) {
@@ -235,6 +272,9 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
         audit(job, Constants.AUDIT_ACTION_INDEX_EXECUTION, Constants.JOB_STATUS_STABLE, "Indexed document chunks into Azure Search", Map.of("chunk_count", chunkCount));
     }
 
+    /**
+     * Marks failed indexing jobs, logging error reasons and resolving retry options.
+     */
     @Override
     @Transactional
     public void failJob(IngestionJob job, Exception e) {
@@ -266,13 +306,7 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
     }
 
     private String createDocumentId(String blobUri, int chunkNumber) {
-        String raw = blobUri + "-Chunk-" + chunkNumber;
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private String sha256(String content) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        return HexFormat.of().formatHex(digest.digest(content.getBytes(StandardCharsets.UTF_8)));
+        return CommonUtils.base64UrlEncode(blobUri + "-Chunk-" + chunkNumber);
     }
 
     private String hostName() {

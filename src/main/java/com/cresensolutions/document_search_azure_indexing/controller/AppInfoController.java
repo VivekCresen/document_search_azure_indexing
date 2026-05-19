@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * REST controller for exposing service metadata and configuration validation checks.
+ */
 @RestController
 @RequestMapping("/api/indexing")
 @RequiredArgsConstructor
@@ -17,7 +20,11 @@ public class AppInfoController {
     private final AzureIndexingProperties properties;
     private final IndexingConfigurationValidator validator;
 
-
+    /**
+     * Exposes service metadata, designated indices, storage details, and environment parameter validation states.
+     *
+     * @return a map of metadata properties and configuration check statuses
+     */
     @GetMapping("/info")
     public Map<String, Object> info() {
         return Map.of(

@@ -5,6 +5,7 @@ import com.cresensolutions.document_search_azure_indexing.dto.DiSpan;
 import com.cresensolutions.document_search_azure_indexing.dto.DownloadedBlob;
 import com.cresensolutions.document_search_azure_indexing.dto.ParsedDocument;
 import com.cresensolutions.document_search_azure_indexing.parser.DocumentParserService;
+import com.cresensolutions.document_search_azure_indexing.utils.CommonUtils;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
@@ -25,9 +26,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Implementation of {@link DocumentParserService} using a hybrid strategy:
+ * attempts Azure Document Intelligence for supported high-fidelity formats,
+ * and falls back to Apache Tika for local cross-platform text extraction.
+ */
 @Service
 public class DocumentParserServiceImpl implements DocumentParserService {
 
+    /** Set of file extensions natively supported by Azure Document Intelligence */
     private static final Set<String> DOCUMENT_INTELLIGENCE_EXTENSIONS = Set.of(
             ".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"
     );
@@ -36,22 +43,39 @@ public class DocumentParserServiceImpl implements DocumentParserService {
     private final AzureIndexingProperties properties;
     private final RestClient restClient;
 
+    /**
+     * Constructs a DocumentParserServiceImpl with necessary configurations.
+     *
+     * @param properties indexing configuration properties
+     * @param restClientBuilder building utility for REST API consumption
+     */
     public DocumentParserServiceImpl(AzureIndexingProperties properties, RestClient.Builder restClientBuilder) {
         this.properties = properties;
         this.restClient = restClientBuilder.build();
     }
 
+    /**
+     * Parses the text content from the specified local downloaded blob, checking
+     * Document Intelligence support before falling back to local Apache Tika.
+     *
+     * @param downloadedBlob the local reference of the downloaded storage blob
+     * @return the parsed document holding text, title, and metadata Map
+     */
     @Override
     public ParsedDocument parse(DownloadedBlob downloadedBlob) {
         if (isDocumentIntelligenceEnabled() && isDocumentIntelligenceSupported(downloadedBlob.fileName())) {
             try {
                 return parseWithDocumentIntelligence(downloadedBlob);
             } catch (Exception ignored) {
+                // Fail gracefully and fall back to local parser
             }
         }
         return parseWithTika(downloadedBlob);
     }
 
+    /**
+     * Extracts text from the downloaded file using local Apache Tika library.
+     */
     private ParsedDocument parseWithTika(DownloadedBlob downloadedBlob) {
         try (InputStream inputStream = Files.newInputStream(downloadedBlob.path())) {
             BodyContentHandler handler = new BodyContentHandler(-1);
@@ -80,7 +104,7 @@ public class DocumentParserServiceImpl implements DocumentParserService {
 
     private ParsedDocument parseWithDocumentIntelligence(DownloadedBlob downloadedBlob) throws Exception {
         String submitUrl = "%s/documentintelligence/documentModels/prebuilt-read:analyze?api-version=%s".formatted(
-                properties.documentIntelligence().endpoint().replaceAll("/$", ""),
+                CommonUtils.trimTrailingSlash(properties.documentIntelligence().endpoint()),
                 properties.documentIntelligence().apiVersion()
         );
         String base64Source = Base64.getEncoder().encodeToString(Files.readAllBytes(downloadedBlob.path()));

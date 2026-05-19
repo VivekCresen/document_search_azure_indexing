@@ -15,6 +15,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Implementation of {@link FolderResolverService} that uses Spring JdbcTemplate
+ * to query virtual directory structures and caches resolved folder IDs to accelerate performance.
+ */
 @Service
 @RequiredArgsConstructor
 public class FolderResolverServiceImpl implements FolderResolverService {
@@ -22,6 +26,13 @@ public class FolderResolverServiceImpl implements FolderResolverService {
     private final AzureIndexingProperties properties;
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Resolves the parent folder ID corresponding to the given blob file storage path URI,
+     * utilizing regional partition caches for high performance.
+     *
+     * @param blobUri the fully qualified storage URI of the document
+     * @return an Optional containing the folder ID if found, or empty
+     */
     @Override
     @Cacheable(value = Constants.CACHE_FOLDER_RESOLUTION, key = "#blobUri")
     public Optional<Long> resolveFolderId(String blobUri) {

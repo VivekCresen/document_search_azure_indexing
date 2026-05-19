@@ -24,6 +24,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Implementation of {@link IngestionQueueService} managing transactional database
+ * states for ingestion and deletion tasks. Uses database locking states to prevent concurrent operations.
+ */
 @Service
 @lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
@@ -37,6 +41,12 @@ public class IngestionQueueServiceImpl implements IngestionQueueService {
     private final FileInIndexRepository fileInIndexRepository;
     private final IndexAuditLogRepository auditLogRepository;
 
+    /**
+     * Periodically scans storage container, queues new files, updates timestamps,
+     * and flags missing files for deletion from search indexes.
+     *
+     * @return scan result counters
+     */
     @Override
     @Transactional
     public BlobScanResult scanAndQueue() {
@@ -71,6 +81,11 @@ public class IngestionQueueServiceImpl implements IngestionQueueService {
         );
     }
 
+    /**
+     * Utility method to requeue stable files back into processing.
+     *
+     * @return count of requeued files
+     */
     @Override
     @Transactional
     public int requeueStableFiles() {
@@ -92,6 +107,14 @@ public class IngestionQueueServiceImpl implements IngestionQueueService {
         return stableFiles.size();
     }
 
+    /**
+     * Implements real-time single blob trigger queueing (e.g. from user uploads).
+     *
+     * @param blobUri target unique URI
+     * @param blobName storage relative path
+     * @param fileName local clean file name
+     * @return true if queued successfully
+     */
     @Override
     @Transactional
     public boolean queueSingleBlob(String blobUri, String blobName, String fileName) {
@@ -136,6 +159,10 @@ public class IngestionQueueServiceImpl implements IngestionQueueService {
         return true;
     }
 
+    /**
+     * Determines whether to queue an ingestion job for discovered files
+     * based on last-modified timestamps and concurrency locks.
+     */
     private boolean queueIngestionIfNeeded(BlobInventoryItem blob) {
         Long folderId = folderResolverService.resolveFolderId(blob.blobUri()).orElse(null);
         FileInIndex file = fileInIndexRepository.findByBlobUri(blob.blobUri())
@@ -180,6 +207,9 @@ public class IngestionQueueServiceImpl implements IngestionQueueService {
         return true;
     }
 
+    /**
+     * Flags a missing storage blob for database and search index deletion.
+     */
     private boolean queueDeletion(String blobUri) {
         FileInIndex file = fileInIndexRepository.findByBlobUri(blobUri).orElse(null);
         if (file == null || BUSY_STATUSES.contains(file.getStatus())) {
@@ -201,6 +231,9 @@ public class IngestionQueueServiceImpl implements IngestionQueueService {
         return true;
     }
 
+    /**
+     * Helper to persist structured audit logging events.
+     */
     private void audit(IngestionJob job, String action, String status, String message, Map<String, Object> metadata) {
         auditLogRepository.save(IndexAuditLog.builder()
                 .job(job)

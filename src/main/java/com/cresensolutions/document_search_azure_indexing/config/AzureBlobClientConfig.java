@@ -8,9 +8,19 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
+/**
+ * Configuration class that instantiates and registers the Azure SDK {@link BlobContainerClient}
+ * bean, using either a direct connection string or custom account/key credentials.
+ */
 @Configuration
 public class AzureBlobClientConfig {
 
+    /**
+     * Creates and registers the Azure storage blob container client based on configuration.
+     *
+     * @param properties Azure configuration properties holding credentials and URLs
+     * @return the BlobContainerClient instance connected to the designated storage container
+     */
     @Bean
     BlobContainerClient indexingBlobContainerClient(AzureIndexingProperties properties) {
         AzureIndexingProperties.Storage storage = properties.storage();

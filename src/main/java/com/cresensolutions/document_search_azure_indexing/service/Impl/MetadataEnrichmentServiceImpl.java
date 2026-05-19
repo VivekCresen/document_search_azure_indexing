@@ -3,6 +3,7 @@ package com.cresensolutions.document_search_azure_indexing.service.Impl;
 import com.cresensolutions.document_search_azure_indexing.config.AzureIndexingProperties;
 import com.cresensolutions.document_search_azure_indexing.dto.EnrichmentResult;
 import com.cresensolutions.document_search_azure_indexing.service.MetadataEnrichmentService;
+import com.cresensolutions.document_search_azure_indexing.utils.CommonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -16,6 +17,10 @@ import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Implementation of {@link MetadataEnrichmentService} that prompts Spring AI's ChatModel
+ * to extract intents, primary topics, and relevant search queries from chunk texts.
+ */
 @Service
 @RequiredArgsConstructor
 public class MetadataEnrichmentServiceImpl implements MetadataEnrichmentService {
@@ -24,6 +29,13 @@ public class MetadataEnrichmentServiceImpl implements MetadataEnrichmentService 
     private final ObjectMapper objectMapper;
     private final ObjectProvider<ChatModel> chatModelProvider;
 
+    /**
+     * Extracts cognitive topic tags, intent signals, and suggested user queries for a given chunk
+     * via LLM prompt. Falls back to empty values if AI is disabled or fails.
+     *
+     * @param chunkText the text block to be enriched
+     * @return the EnrichmentResult containing lists of topics, queries, and intent signals
+     */
     @Override
     public EnrichmentResult enrich(String chunkText) {
         if (!StringUtils.hasText(properties.openAi().endpoint())
@@ -59,7 +71,7 @@ public class MetadataEnrichmentServiceImpl implements MetadataEnrichmentService 
                 return EnrichmentResult.empty();
             }
             @SuppressWarnings("unchecked")
-            Map<String, Object> parsed = objectMapper.readValue(content, Map.class);
+            Map<String, Object> parsed = CommonUtils.parseLlmJson(content, Map.class, objectMapper);
             return new EnrichmentResult(
                     stringList(parsed.get("topics")),
                     stringList(parsed.get("example_queries")),
@@ -70,6 +82,9 @@ public class MetadataEnrichmentServiceImpl implements MetadataEnrichmentService 
         }
     }
 
+    /**
+     * Safely pulls the raw text response content from ChatResponse.
+     */
     private String extractContent(ChatResponse response) {
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             return "";
@@ -77,6 +92,9 @@ public class MetadataEnrichmentServiceImpl implements MetadataEnrichmentService 
         return response.getResult().getOutput().getText();
     }
 
+    /**
+     * Coerces any parsed JSON list or single value into a clean, trimmed String list.
+     */
     private List<String> stringList(Object value) {
         if (value instanceof List<?> list) {
             return list.stream()

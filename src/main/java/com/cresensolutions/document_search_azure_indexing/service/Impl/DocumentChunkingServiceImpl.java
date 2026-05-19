@@ -14,12 +14,23 @@ import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Implementation of {@link DocumentChunkingService} that segments raw text
+ * into semantic segments based on paragraph breaks, sentence boundaries, and configured sizes.
+ */
 @Service
 @RequiredArgsConstructor
 public class DocumentChunkingServiceImpl implements DocumentChunkingService {
 
     private final AzureIndexingProperties properties;
 
+    /**
+     * Segments the parsed document into overlaps using paragraph breaks and punctuation.
+     * Maps corresponding high-fidelity Document Intelligence page spans to each chunk.
+     *
+     * @param parsedDocument the parsed document data structure holding text and spans
+     * @return a list of processed document chunks
+     */
     @Override
     public List<DocumentChunk> chunk(ParsedDocument parsedDocument) {
         int chunkSize = Math.max(500, properties.settings().chunkSize());
@@ -70,15 +81,21 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
         return chunks;
     }
 
+    /**
+     * Filters and matches the layout spans that overlap with the current chunk text.
+     */
     private List<DiSpan> matchingSpans(String chunkText, List<DiSpan> spans) {
         if (spans == null || spans.isEmpty()) {
             return List.of();
         }
         return spans.stream()
-                .filter(span -> belongsToChunk(chunkText, span.paragraphText()))
-                .toList();
+            .filter(span -> belongsToChunk(chunkText, span.paragraphText()))
+            .toList();
     }
 
+    /**
+     * Determines if a specific paragraph layout span text belongs within the sliced chunk text.
+     */
     private boolean belongsToChunk(String chunkText, String paragraphText) {
         if (paragraphText == null || paragraphText.isBlank()) {
             return false;
@@ -94,6 +111,9 @@ public class DocumentChunkingServiceImpl implements DocumentChunkingService {
         return !fingerprint.isBlank() && chunkText.contains(fingerprint);
     }
 
+    /**
+     * Safely parses page numbers from metadata properties.
+     */
     private int intMetadata(Object value, int fallback) {
         return value instanceof Number number ? number.intValue() : fallback;
     }

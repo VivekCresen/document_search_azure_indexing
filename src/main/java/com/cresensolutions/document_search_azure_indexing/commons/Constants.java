@@ -6,6 +6,9 @@ package com.cresensolutions.document_search_azure_indexing.commons;
  */
 public class Constants extends Common {
 
+    /**
+     * Private constructor to prevent instantiation of constants class.
+     */
     private Constants() {
     }
 }

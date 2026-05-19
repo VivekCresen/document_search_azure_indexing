@@ -10,12 +10,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Implementation of {@link IndexingConfigurationValidator} checking environment variables,
+ * connectivity strings, and model definitions on startup.
+ */
 @Service
 @RequiredArgsConstructor
 public class IndexingConfigurationValidatorImpl implements IndexingConfigurationValidator {
 
     private final AzureIndexingProperties properties;
 
+    /**
+     * Inspects configuration targets, verifying mandatory Azure Search parameters,
+     * embedding configurations, and storage properties.
+     *
+     * @return validation mapping with status and list of missing configuration fields
+     */
     @Override
     public Map<String, Object> validate() {
         List<String> missing = new ArrayList<>();
@@ -43,6 +53,9 @@ public class IndexingConfigurationValidatorImpl implements IndexingConfiguration
         );
     }
 
+    /**
+     * Adds the parameter name to the missing list if the value is null or blank.
+     */
     private void require(List<String> missing, String value, String name) {
         if (!StringUtils.hasText(value)) {
             missing.add(name);

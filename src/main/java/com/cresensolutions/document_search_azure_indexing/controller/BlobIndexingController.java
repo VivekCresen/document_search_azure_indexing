@@ -18,6 +18,10 @@ import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * REST controller providing APIs to audit storage blobs, trigger scheduled folder scans manually,
+ * query queue size statistics, and queue stable documents back to ingestion states.
+ */
 @RestController
 @RequestMapping("/api/indexing/blobs")
 @RequiredArgsConstructor
@@ -27,22 +31,42 @@ public class BlobIndexingController {
     private final IngestionQueueService ingestionQueueService;
     private final IngestionJobRepository ingestionJobRepository;
 
-
+    /**
+     * Lists all indexable files found inside the Azure Blob Storage container root folders.
+     *
+     * @return a list of indexable blob inventory metadata items
+     */
     @GetMapping
     public List<BlobInventoryItem> listBlobs() {
         return blobStorageInventoryService.listIndexableBlobs();
     }
 
+    /**
+     * Triggers a manual container partition scan and queues any discovered new/modified blobs.
+     *
+     * @return the scan outcomes and details of queued documents
+     */
     @PostMapping("/scan")
     public BlobScanResult scanAndQueue() {
         return ingestionQueueService.scanAndQueue();
     }
 
+    /**
+     * Resets status tags of all stable indexed files back to a queueable state.
+     *
+     * @return status counts of queued documents
+     */
     @PostMapping("/requeue-stable")
     public Map<String, Object> requeueStableFiles() {
         return Map.of("queued", ingestionQueueService.requeueStableFiles());
     }
 
+    /**
+     * Returns total job tracking sizes matching a specific status filter.
+     *
+     * @param status job status name
+     * @return map holding filtered queue sizes
+     */
     @GetMapping("/jobs/count")
     public Map<String, Long> countJobs(@RequestParam(defaultValue = "to_be_ingested") String status) {
         return Map.of(status, ingestionJobRepository.countByStatus(status));

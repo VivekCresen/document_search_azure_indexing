@@ -13,6 +13,10 @@ import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * REST controller providing administrative and manual endpoints to trigger
+ * ingestion workers or upgrade the Cognitive Search index schema.
+ */
 @RestController
 @RequestMapping("/api/indexing/jobs")
 @RequiredArgsConstructor
@@ -22,13 +26,23 @@ public class IndexingJobController {
     private final AzureSearchIndexService azureSearchIndexService;
     private final AzureIndexingProperties properties;
 
-
+    /**
+     * Triggers the ingestion worker to fetch and execute pending jobs up to a limit.
+     *
+     * @param maxJobs custom limit, defaults to system configuration settings
+     * @return summary results of completed, skipped, or failed tasks
+     */
     @PostMapping("/process")
     public JobProcessResult process(@RequestParam(required = false) Integer maxJobs) {
         int limit = maxJobs == null ? properties.settings().maxJobsPerCycle() : maxJobs;
         return workerService.processQueuedJobs(limit);
     }
 
+    /**
+     * Re-initializes or upgrades the Azure Vector Index schema based on code definitions.
+     *
+     * @return status mapping containing the affected index name
+     */
     @PostMapping("/index-schema")
     public Map<String, Object> createOrUpdateIndex() {
         azureSearchIndexService.createOrUpdateIndex();
