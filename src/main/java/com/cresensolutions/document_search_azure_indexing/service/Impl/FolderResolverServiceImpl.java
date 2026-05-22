@@ -124,8 +124,8 @@ public class FolderResolverServiceImpl implements FolderResolverService {
      */
     private Optional<Long> findFolder(String name, Long parentId) {
         String sql = parentId == null
-                ? "select id from prestage.documents where name = ? and is_file = false and parent_id is null limit 1"
-                : "select id from prestage.documents where name = ? and is_file = false and parent_id = ? limit 1";
+                ? "select id from demo.documents where name = ? and is_file = false and parent_id is null limit 1"
+                : "select id from demo.documents where name = ? and is_file = false and parent_id = ? limit 1";
         List<Long> ids = parentId == null
                 ? jdbcTemplate.queryForList(sql, Long.class, name)
                 : jdbcTemplate.queryForList(sql, Long.class, name, parentId);
@@ -141,7 +141,7 @@ public class FolderResolverServiceImpl implements FolderResolverService {
      */
     private Optional<Long> findAnyFolderByName(String name) {
         List<Long> ids = jdbcTemplate.queryForList(
-                "select id from prestage.documents where name = ? and is_file = false order by id desc limit 1",
+                "select id from demo.documents where name = ? and is_file = false order by id desc limit 1",
                 Long.class,
                 name
         );
