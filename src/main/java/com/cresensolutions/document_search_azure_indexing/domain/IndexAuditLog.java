@@ -20,7 +20,7 @@ import java.time.OffsetDateTime;
 import java.util.Map;
 
 @Entity
-@Table(name = "index_audit_logs", schema = "demo")
+@Table(name = "index_audit_logs", schema = "prestage")
 @Data
 @Builder
 @NoArgsConstructor

@@ -16,7 +16,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "files_in_index", schema = "demo")
+@Table(name = "files_in_index", schema = "prestage")
 @Data
 @Builder
 @NoArgsConstructor

@@ -78,21 +78,21 @@ class FolderResolverServiceTest {
         // start = 0: subList => [folderA, folderB]
         // findFolder(folderA, null) -> empty
         when(jdbcTemplate.queryForList(
-                "select id from demo.documents where name = ? and is_file = false and parent_id is null limit 1",
+                "select id from prestage.documents where name = ? and is_file = false and parent_id is null limit 1",
                 Long.class, "folderA"))
                 .thenReturn(List.of());
 
         // start = 1: subList => [folderB]
         // findFolder(folderB, null) -> empty
         when(jdbcTemplate.queryForList(
-                "select id from demo.documents where name = ? and is_file = false and parent_id is null limit 1",
+                "select id from prestage.documents where name = ? and is_file = false and parent_id is null limit 1",
                 Long.class, "folderB"))
                 .thenReturn(List.of());
 
         // Fallback by name: starts from folderSegments.size()-1 => index 1 (folderB)
         // findAnyFolderByName(folderB) -> returns 30L
         when(jdbcTemplate.queryForList(
-                "select id from demo.documents where name = ? and is_file = false order by id desc limit 1",
+                "select id from prestage.documents where name = ? and is_file = false order by id desc limit 1",
                 Long.class, "folderB"))
                 .thenReturn(List.of(30L));
 
@@ -109,13 +109,13 @@ class FolderResolverServiceTest {
         // folderSegments: [folderA]
         // findFolder(folderA, null) -> empty
         when(jdbcTemplate.queryForList(
-                eq("select id from demo.documents where name = ? and is_file = false and parent_id is null limit 1"),
+                eq("select id from prestage.documents where name = ? and is_file = false and parent_id is null limit 1"),
                 eq(Long.class), eq("folderA")))
                 .thenReturn(List.of());
 
         // findAnyFolderByName(folderA) -> empty
         when(jdbcTemplate.queryForList(
-                eq("select id from demo.documents where name = ? and is_file = false order by id desc limit 1"),
+                eq("select id from prestage.documents where name = ? and is_file = false order by id desc limit 1"),
                 eq(Long.class), eq("folderA")))
                 .thenReturn(List.of());
 

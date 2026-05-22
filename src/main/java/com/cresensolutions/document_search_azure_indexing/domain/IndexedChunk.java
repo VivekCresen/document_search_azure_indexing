@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "indexed_chunks", schema = "demo")
+@Table(name = "indexed_chunks", schema = "prestage")
 @Data
 @Builder
 @NoArgsConstructor
