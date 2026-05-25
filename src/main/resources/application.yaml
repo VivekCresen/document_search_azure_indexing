@@ -57,12 +57,18 @@ spring:
     caffeine:
       spec: ${INDEXING_CACHE_SPEC:maximumSize=2000,expireAfterWrite=15m}
 
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 60s
+
 azure:
   indexing:
     search:
       endpoint: ${AZURE_SEARCH_ENDPOINT:https://dummy.search.windows.net}
       api-key: ${AZURE_SEARCH_ADMIN_KEY:${AZURE_SEARCH_KEY:dummy-key}}
-      index-name: ${AZURE_SEARCH_INDEX_NAME:document-index}
+      index-name: ${AZURE_SEARCH_INDEX_NAME:cresen_intern_chatbot}
       api-version: ${AZURE_SEARCH_API_VERSION:2023-11-01}
     storage:
       account-name: ${AZURE_STORAGE_ACCOUNT_NAME:cresengpt}
@@ -79,7 +85,7 @@ azure:
       api-version: ${AZURE_OPENAI_API_VERSION:2024-02-01}
     document-intelligence:
       endpoint: ${AZURE_DI_ENDPOINT:https://dummy.cognitiveservices.azure.com/}
-      api-key: ${AZURE_DI_KEY:dummy-key}
+      # api-key: ${AZURE_DI_KEY:}
       api-version: ${AZURE_DI_API_VERSION:2024-02-29-preview}
     settings:
       chunk-size: ${CHUNK_SIZE:1500}
@@ -88,7 +94,7 @@ azure:
       max-retries: ${MAX_RETRIES:3}
       blob-scan-enabled: ${INDEXING_BLOB_SCAN_ENABLED:false}
       blob-scan-fixed-delay-ms: ${INDEXING_BLOB_SCAN_FIXED_DELAY_MS:60000}
-      job-processing-enabled: ${INDEXING_JOB_PROCESSING_ENABLED:false}
+      job-processing-enabled: ${INDEXING_JOB_PROCESSING_ENABLED:true}
       job-processing-fixed-delay-ms: ${INDEXING_JOB_PROCESSING_FIXED_DELAY_MS:120000}
       max-jobs-per-cycle: ${INDEXING_MAX_JOBS_PER_CYCLE:4}
       supported-extensions:

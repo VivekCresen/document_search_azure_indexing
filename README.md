@@ -17,7 +17,7 @@ Create a `.env` file in this folder or the workspace root:
 ```properties
 AZURE_SEARCH_ENDPOINT=
 AZURE_SEARCH_ADMIN_KEY=
-AZURE_SEARCH_INDEX_NAME=document-index
+AZURE_SEARCH_INDEX_NAME=cresen_intern_chatbot
 AZURE_STORAGE_ACCOUNT_NAME=
 AZURE_STORAGE_ACCOUNT_KEY=
 AZURE_STORAGE_ACCOUNT_URL=

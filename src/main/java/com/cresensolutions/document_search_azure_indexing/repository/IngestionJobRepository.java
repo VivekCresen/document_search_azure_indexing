@@ -46,4 +46,12 @@ public interface IngestionJobRepository extends JpaRepository<IngestionJob, Long
      * @return the count of matching jobs
      */
     long countByStatus(String status);
+
+    /**
+     * Finds all ingestion jobs matching a specific status.
+     *
+     * @param status the target job status
+     * @return a list of matching ingestion jobs
+     */
+    List<IngestionJob> findByStatus(String status);
 }

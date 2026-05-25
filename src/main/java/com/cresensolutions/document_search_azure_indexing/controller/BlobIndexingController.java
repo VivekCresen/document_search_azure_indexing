@@ -46,10 +46,10 @@ public class BlobIndexingController {
      *
      * @return the scan outcomes and details of queued documents
      */
-    @PostMapping("/scan")
-    public BlobScanResult scanAndQueue() {
-        return ingestionQueueService.scanAndQueue();
-    }
+    // @PostMapping("/scan")
+    // public BlobScanResult scanAndQueue() {
+    //     return ingestionQueueService.scanAndQueue();
+    // }
 
     /**
      * Resets status tags of all stable indexed files back to a queueable state.

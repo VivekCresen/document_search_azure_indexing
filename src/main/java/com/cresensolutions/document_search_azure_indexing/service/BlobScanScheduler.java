@@ -24,7 +24,10 @@ public class BlobScanScheduler {
      * Periodically triggers container scanning and ingestion queueing
      * with the delay configured via application settings.
      */
-    @Scheduled(fixedDelayString = "${azure.indexing.settings.blob-scan-fixed-delay-ms:60000}")
+    @Scheduled(
+            fixedDelayString = "${azure.indexing.settings.blob-scan-fixed-delay-ms:60000}",
+            initialDelayString = "${azure.indexing.settings.blob-scan-initial-delay-ms:2000}"
+    )
     public void scanAndQueue() {
         try {
             BlobScanResult result = ingestionQueueService.scanAndQueue();

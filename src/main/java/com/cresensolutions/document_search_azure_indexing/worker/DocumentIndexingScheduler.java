@@ -19,7 +19,10 @@ public class DocumentIndexingScheduler {
     private final AzureIndexingProperties properties;
 
 
-    @Scheduled(fixedDelayString = "${azure.indexing.settings.job-processing-fixed-delay-ms:120000}")
+    @Scheduled(
+            fixedDelayString = "${azure.indexing.settings.job-processing-fixed-delay-ms:120000}",
+            initialDelayString = "${azure.indexing.settings.job-processing-initial-delay-ms:1000}"
+    )
     public void processQueuedJobs() {
         JobProcessResult result = workerService.processQueuedJobs(properties.settings().maxJobsPerCycle());
         log.info("Indexing cycle complete: processed={}, succeeded={}, failed={}",

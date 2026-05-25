@@ -35,11 +35,11 @@ public class IndexingJobController {
      * @param maxJobs custom limit, defaults to system configuration settings
      * @return summary results of completed, skipped, or failed tasks
      */
-    @PostMapping("/process")
-    public JobProcessResult process(@RequestParam(required = false) Integer maxJobs) {
-        int limit = maxJobs == null ? properties.settings().maxJobsPerCycle() : maxJobs;
-        return workerService.processQueuedJobs(limit);
-    }
+    // @PostMapping("/process")
+    // public JobProcessResult process(@RequestParam(required = false) Integer maxJobs) {
+    //     int limit = maxJobs == null ? properties.settings().maxJobsPerCycle() : maxJobs;
+    //     return workerService.processQueuedJobs(limit);
+    // }
 
     /**
      * Re-initializes or upgrades the Azure Vector Index schema based on code definitions.
@@ -56,22 +56,39 @@ public class IndexingJobController {
         );
     }
 
+    /**
+     * Deletes the configured Azure Vector Index.
+     * 
+     * @return status mapping containing the affected index name
+     */
     @DeleteMapping("/index-schema")
     public Map<String, Object> deleteConfiguredIndex() {
         azureSearchIndexService.deleteIndex(properties.search().indexName());
         return Map.of("index", properties.search().indexName(), "deleted", true);
     }
 
+    /**
+     * Lists all available indexes in Azure Cognitive Search.
+     * 
+     * @return mapping containing the list of indexes
+     */
     @GetMapping("/indexes")
     public Map<String, Object> listIndexes() {
         return Map.of("indexes", azureSearchIndexService.listIndexes());
     }
 
+    /**
+     * Deletes a specific index by name.
+     * 
+     * @param indexName the name of the index to delete
+     * @return status mapping containing the deleted index name
+     */
     @DeleteMapping("/indexes/{indexName}")
     public Map<String, Object> deleteIndex(@PathVariable String indexName) {
         azureSearchIndexService.deleteIndex(indexName);
         return Map.of("index", indexName, "deleted", true);
     }
+    
 
     @DeleteMapping("/documents")
     public Map<String, Object> clearIndexDocuments() {
