@@ -95,7 +95,7 @@ azure:
       blob-scan-enabled: ${INDEXING_BLOB_SCAN_ENABLED:false}
       blob-scan-fixed-delay-ms: ${INDEXING_BLOB_SCAN_FIXED_DELAY_MS:60000}
       job-processing-enabled: ${INDEXING_JOB_PROCESSING_ENABLED:true}
-      job-processing-fixed-delay-ms: ${INDEXING_JOB_PROCESSING_FIXED_DELAY_MS:120000}
+      job-processing-fixed-delay-ms: ${INDEXING_JOB_PROCESSING_FIXED_DELAY_MS:10000}
       max-jobs-per-cycle: ${INDEXING_MAX_JOBS_PER_CYCLE:4}
       supported-extensions:
         - .pdf

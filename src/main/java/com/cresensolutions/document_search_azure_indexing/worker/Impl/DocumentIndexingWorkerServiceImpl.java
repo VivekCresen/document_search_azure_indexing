@@ -152,10 +152,35 @@ public class DocumentIndexingWorkerServiceImpl implements DocumentIndexingWorker
                 throw new IllegalStateException("Spring AI EmbeddingModel is not configured");
             }
 
-            for (DocumentChunk chunk : chunks) {
-                EnrichmentResult enrichment = metadataEnrichmentService.enrich(chunk.content());
+            // 1. Batch generate embeddings for all chunks in one single network roundtrip
+            List<String> chunkTexts = chunks.stream().map(DocumentChunk::content).toList();
+            log.info("[processIngestion] Batch generating embeddings for {} chunks...", chunks.size());
+            List<float[]> embeddings = embeddingModel.embed(chunkTexts);
+            log.info("[processIngestion] Batch embedding generation complete.");
+
+            // 2. Perform metadata enrichment for all chunks in parallel to prevent channel timeouts
+            log.info("[processIngestion] Concurrently enriching {} chunks...", chunks.size());
+            List<EnrichmentResult> enrichments = chunks.parallelStream()
+                    .map(chunk -> metadataEnrichmentService.enrich(chunk.content()))
+                    .toList();
+            log.info("[processIngestion] Concurrent enrichment complete.");
+
+            // Safety check to ensure matching bounds
+            if (embeddings.size() != chunks.size() || enrichments.size() != chunks.size()) {
+                throw new IllegalStateException(String.format(
+                        "Mismatch in generated outputs. Chunks: %d, Embeddings: %d, Enrichments: %d",
+                        chunks.size(), embeddings.size(), enrichments.size()
+                ));
+            }
+
+            // 3. Construct and map the documents sequentially
+            for (int i = 0; i < chunks.size(); i++) {
+                DocumentChunk chunk = chunks.get(i);
+                EnrichmentResult enrichment = enrichments.get(i);
+                float[] embedding = embeddings.get(i);
                 String searchDocumentId = createDocumentId(job.getBlobUri(), chunk.chunkNumber());
-                searchDocuments.add(toSearchDocument(job, chunk, enrichment, embeddingModel.embed(chunk.content()), searchDocumentId));
+
+                searchDocuments.add(toSearchDocument(job, chunk, enrichment, embedding, searchDocumentId));
                 indexedChunks.add(IndexedChunk.builder()
                         .job(job)
                         .blobUri(job.getBlobUri())

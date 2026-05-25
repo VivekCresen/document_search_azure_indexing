@@ -6,6 +6,7 @@ import com.cresensolutions.document_search_azure_indexing.dto.TriggerIndexReques
 import com.cresensolutions.document_search_azure_indexing.repository.IngestionJobRepository;
 import com.cresensolutions.document_search_azure_indexing.service.BlobStorageInventoryService;
 import com.cresensolutions.document_search_azure_indexing.service.IngestionQueueService;
+import com.cresensolutions.document_search_azure_indexing.worker.DocumentIndexingWorkerService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,8 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * REST controller providing APIs to audit storage blobs, trigger scheduled folder scans manually,
@@ -25,11 +28,13 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/indexing/blobs")
 @RequiredArgsConstructor
+@Slf4j
 public class BlobIndexingController {
 
     private final BlobStorageInventoryService blobStorageInventoryService;
     private final IngestionQueueService ingestionQueueService;
     private final IngestionJobRepository ingestionJobRepository;
+    private final DocumentIndexingWorkerService workerService;
 
     /**
      * Lists all indexable files found inside the Azure Blob Storage container root folders.
@@ -97,6 +102,21 @@ public class BlobIndexingController {
                 request.blobName(),
                 request.fileName()
         );
+
+        if (queued) {
+            // Trigger job processing asynchronously so the uploaded file is indexed instantly in the background
+            CompletableFuture.runAsync(() -> {
+                try {
+                    // Split-second sleep to ensure the queueSingleBlob transaction is committed in the main thread
+                    Thread.sleep(150);
+                    log.info("[IndexingTrigger] Running real-time background processing for queued blob: {}", request.blobUri());
+                    workerService.processQueuedJobs(4);
+                } catch (Exception e) {
+                    log.error("[IndexingTrigger] Failed to execute triggered indexing job asynchronously", e);
+                }
+            });
+        }
+
         return Map.of(
                 "queued", queued,
                 "blobUri", request.blobUri() == null ? "" : request.blobUri()

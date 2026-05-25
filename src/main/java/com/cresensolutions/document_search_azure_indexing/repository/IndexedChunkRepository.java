@@ -2,6 +2,7 @@ package com.cresensolutions.document_search_azure_indexing.repository;
 
 import com.cresensolutions.document_search_azure_indexing.domain.IndexedChunk;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -25,5 +26,6 @@ public interface IndexedChunkRepository extends JpaRepository<IndexedChunk, Long
      *
      * @param blobUri the target document's blob storage URI
      */
+    @Transactional
     void deleteByBlobUri(String blobUri);
 }

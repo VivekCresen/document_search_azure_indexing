@@ -128,7 +128,7 @@ class DocumentIndexingWorkerServiceTest {
         when(documentChunkingService.chunk(parsed)).thenReturn(List.of(chunk));
 
         when(embeddingModelProvider.getIfAvailable()).thenReturn(embeddingModel);
-        when(embeddingModel.embed("content")).thenReturn(new float[]{0.1f, 0.2f});
+        when(embeddingModel.embed(List.of("content"))).thenReturn(List.of(new float[]{0.1f, 0.2f}));
 
         EnrichmentResult enrichmentResult = new EnrichmentResult(List.of("topic"), List.of("query"), List.of("signal"));
         when(metadataEnrichmentService.enrich("content")).thenReturn(enrichmentResult);
